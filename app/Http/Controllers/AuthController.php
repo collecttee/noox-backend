@@ -1,7 +1,9 @@
 <?php
 namespace App\Http\Controllers;
 use Agustind\Ethsignature;
-use BN\Red;
+use App\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redis;
 
 class AuthController extends Controller {
@@ -12,15 +14,29 @@ class AuthController extends Controller {
         return response()
             ->json($this->getResponse(200,['key'=>$key]));
     }
-    public function  verify(string $address,string $signature){
+    public function  verify(Request $request){
+        $address = $request->input('address');
+        $signature = $request->input('signature');
         $message = Redis::get($address);
         $EthSignature = new Ethsignature();
         $result = $EthSignature->verify($message, $signature, $address);
-        if ($result) {
-
+        if (!$result) {
+            $user = User::where('address',$address)->first();
+            if (empty($user)){
+                $model = new User();
+                $model -> address = $address;
+                $model->save();
+                $token = auth()->login($model);
+            }else{
+                $user = auth()->user();
+                var_dump($user);
+            }
+        die;
+            return response()
+                ->json($this->getResponse(200,['token'=>$token]));
         }else{
             return response()
-                ->json($this->getResponse(403));
+                ->json($this->getResponse(401));
         }
     }
 }
