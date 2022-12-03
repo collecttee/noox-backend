@@ -3,16 +3,25 @@ namespace App\Http\Controllers;
 use Agustind\Ethsignature;
 use App\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redis;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller {
+    public function __construct()
+    {
+        $this->middleware('auth:api', ['except' => ['verify','login']]);
+    }
     public function sign(string $address)  {
         $randString = bin2hex(random_bytes(20));
         $key = md5(time().$address.$randString);
         Redis::set($address,$key);
         return response()
             ->json($this->getResponse(200,['key'=>$key]));
+    }
+
+    public function me()
+    {
+        return response()->json(auth('api')->user());
     }
     public function  verify(Request $request){
         $address = $request->input('address');
@@ -26,12 +35,10 @@ class AuthController extends Controller {
                 $model = new User();
                 $model -> address = $address;
                 $model->save();
-                $token = auth()->login($model);
+                $token = JWTAuth::fromUser($model);
             }else{
-                $user = auth()->user();
-                var_dump($user);
+                $token = JWTAuth::fromUser($user);
             }
-        die;
             return response()
                 ->json($this->getResponse(200,['token'=>$token]));
         }else{
