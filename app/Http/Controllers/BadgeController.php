@@ -72,17 +72,28 @@ class BadgeController extends Controller {
         $rules = json_decode($ret->eligibilityRule,1);
         foreach ($rules as $rule){
             $contract = $rule['contract'];
+            $abi = file_get_contents('abi.json');
+            $contractModel = new Contract(env('RPC_URL'),$abi);
+            $contractAbi  = $contractModel->getEthabi();
             $type = $rule['type'];
             $data = ['address'=>$contract];
-
+            $a = $contractAbi->encodeEventSignature($rule['action']);
+            var_dump($rule['action']);
+            dd($a);
             if ($type === 'EVENTLOG') {
                 if (isset($rule['blockNumber'])) {
                     $from = Utils::toHex($rule['blockNumber']['gte']);
                     $to = Utils::toHex($rule['blockNumber']['lte']);
-                    array_push($data,['fromBlock'=>$from,'toBlock'=>$to]);
+                    $data = ['address'=>$contract,'fromBlock'=>'0x'.$from,'toBlock'=>'0x'.$to];
+                }else{
+                    $data = ['address'=>$contract];
+                }
+//                dd($data);
+                $res = ETHRequest::Request('eth_getLogs', [$data]);
+                foreach ($rule['operations'][0]['filters'] as $filters){
+                    dd($filters);
                 }
 
-                ETHRequest::Request('eth_getLogs', [$data]);
             }
         }
     }

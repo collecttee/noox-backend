@@ -12,6 +12,7 @@ class ETHRequest {
                 'id' => 0,
             ]
         ];
+//        dd(env('RPC_URL'));
         $res = $client->post('', $data);
         $body = json_decode($res->getBody());
         if (isset($body->error) && !empty($body->error)) {
