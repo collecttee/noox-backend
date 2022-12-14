@@ -74,12 +74,15 @@ class BadgeController extends Controller {
             $contract = $rule['contract'];
             $abi = file_get_contents('abi.json');
             $contractModel = new Contract(env('RPC_URL'),$abi);
+            $allEvents = $contractModel->getEvents();
             $contractAbi  = $contractModel->getEthabi();
             $type = $rule['type'];
-            $data = ['address'=>$contract];
-            $a = $contractAbi->encodeEventSignature($rule['action']);
-            var_dump($rule['action']);
-            dd($a);
+            $event = formatEvent($allEvents,$rule['action']);
+            if (!$event){
+                return response()
+                    ->json($this->getResponse(400));
+            }
+            $eventSignature = $contractAbi->encodeEventSignature($event);
             if ($type === 'EVENTLOG') {
                 if (isset($rule['blockNumber'])) {
                     $from = Utils::toHex($rule['blockNumber']['gte']);
@@ -88,10 +91,15 @@ class BadgeController extends Controller {
                 }else{
                     $data = ['address'=>$contract];
                 }
-//                dd($data);
-                $res = ETHRequest::Request('eth_getLogs', [$data]);
+//                $res = ETHRequest::Request('eth_getLogs', [$data]);
                 foreach ($rule['operations'][0]['filters'] as $filters){
-                    dd($filters);
+                    list($ret, $key) =  getEventIndex($allEvents,$rule['action'],$filters['field']);
+                    if ($ret) {
+                        $index = 'topics' . $key + 1;
+                        $data[$index] = $filters['value'];
+                    }else{
+
+                    }
                 }
 
             }
