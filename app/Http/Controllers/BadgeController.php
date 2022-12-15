@@ -70,13 +70,19 @@ class BadgeController extends Controller {
                 ->json($this->getResponse(404));
         }
         $rules = json_decode($ret->eligibilityRule,1);
+        // 遍历所有规则 action
         foreach ($rules as $rule){
             $contract = $rule['contract'];
-            $abi = file_get_contents('abi.json');
-            $contractModel = new Contract(env('RPC_URL'),$abi);
+            $res = ETHRequest::etherScanRequest(['module'=>'contract','action'=>'getabi','address'=>$contract]);
+            if ($res['status'] != 1) {
+                return response()
+                    ->json($this->getResponse(404,['detail' => $res['message']]));
+            }
+            $contractModel = new Contract(env('RPC_URL'),$res['result']);
             $allEvents = $contractModel->getEvents();
             $contractAbi  = $contractModel->getEthabi();
             $type = $rule['type'];
+            // 当前action是log类型
             if ($type === 'EVENTLOG') {
                 $event = formatEvent($allEvents,$rule['action']);
                 if (!$event){
@@ -84,22 +90,32 @@ class BadgeController extends Controller {
                         ->json($this->getResponse(400));
                 }
                 $eventSignature = $contractAbi->encodeEventSignature($event);
-//                dd($eventSignature);
+                $data = [
+                    'module' => 'logs' ,
+                    'action' => 'getLogs',
+                    'address' => $contract ,
+                    'topic0' => $eventSignature
+                ];
+                //查看是否存在区块高度限制
                 if (isset($rule['blockNumber'])) {
 //                    $from = Utils::toHex($rule['blockNumber']['gte']);
 //                    $to = Utils::toHex($rule['blockNumber']['lte']);
-                    $data = ['address'=>$contract,'fromBlock'=>$rule['blockNumber']['gte'],'toBlock'=>$rule['blockNumber']['lte'],'topic0'=>$eventSignature];
-                }else{
-                    $data = ['address'=>$contract,'topic0'=>$eventSignature];
+                    $data['fromBlock'] = $rule['blockNumber']['gte'];
+                    $data['toBlock'] = $rule['blockNumber']['lte'];
                 }
+                //遍历各种规则
 //                $res = ETHRequest::Request('eth_getLogs', [$data]);
                 foreach ($rule['operations'][0]['filters'] as $filters){
                     list($ret, $key) =  getEventIndex($allEvents,$rule['action'],$filters['field']);
+                    //发现当前所需日志字段是indexed类型
                     if ($ret == 'indexed') {
-                        $index = 'topics' . ($key + 1);
-                        $data[$index] = $filters['value'];
+                        $index = 'topic' . ($key + 1);
+                        $data[$index] = addAddressPrefix($filters['value']);
+                        $topicAnd = 'topic0_'. $index .'_opr';
+                        $data[$topicAnd] = 'and';
                         $res = ETHRequest::etherScanRequest($data);
                         dd($res);
+                    //不是indexed 类型 那日志存在data里面
                     }else if ($ret == 'non'){
                         list($nonIndexed,$index) = getEventNonIndexedCount($allEvents,$rule['action'],$filters['field']);
 //                        $ret = $contractAbi->decodeParameters($nonIndexed,$val->data);

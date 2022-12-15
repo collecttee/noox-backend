@@ -47,3 +47,8 @@ function getNeedEvent($abiEvents,$event) {
     $event = substr($event,0,strrpos($event,'('));
     return $abiEvents[$event] ?? null;
 }
+
+function addAddressPrefix($address) {
+    $prefix = '000000000000000000000000';
+    return substr_replace($address,$prefix,2,0);
+}

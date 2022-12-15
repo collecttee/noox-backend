@@ -24,8 +24,12 @@ class ETHRequest {
         $params['apikey'] = env('ETHSCAN_KEY');
         $data = http_build_query($params);
         $client = new GuzzleHttp(['timeout' => 60, 'verify' => false]);
-        $response = $client->get(env('ETHSCAN_URL').'?'.$data);
+        $response = $client->get(env('ETHSCAN_URL').'?'.$data,[ 'proxy' => [
+            'http'  => 'http://127.0.0.1:4780', // Use this proxy with "http"
+            'https' => 'http://127.0.0.1:4780', // Use this proxy with "https",
+        ]]);
         $ret = $response->getBody()->getContents();
-        dd($ret);
+        $ret = json_decode($ret,1);
+        return $ret;
     }
 }

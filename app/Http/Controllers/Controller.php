@@ -15,7 +15,8 @@ class Controller extends BaseController
         401 => 'Validation failed',
         403 => 'Form validation failed',
         404 => 'This resource was not found',
-        400 => 'Log parsing failed'
+        400 => 'Log parsing failed',
+
     ];
     protected  function getResponse($status,$data = []){
         return ['status' => $status , 'msg' => $this->return[$status], 'data' => $data];
