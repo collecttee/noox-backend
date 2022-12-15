@@ -1,9 +1,10 @@
 <?php
 function formatEvent($abiEvents,$event) {
     $ret = getNeedEvent($abiEvents,$event);
+
     if (!empty($ret)){
         $values = array_column($ret['inputs'],'type');
-         return $event . '(' . implode(',',$values) . ')';
+         return $ret['name'] . '(' . implode(',',$values) . ')';
     }else{
         return false;
     }
@@ -17,16 +18,27 @@ function getEventIndex($abiEvents,$event,$field) {
         } else {
             return ['non',$key];
         }
-    }else{
+    } else {
         return [false,];
     }
 }
 
-function getEventNonIndexedCount($abiEvents,$event) {
+function getEventNonIndexedCount($abiEvents,$event,$field) {
     $ret = getNeedEvent($abiEvents,$event);
+    $arr = [];
     if (!empty($ret)){
-//        foreach ()
+        $count = -1;
+        foreach ($ret['inputs'] as $val) {
+            if($val['indexed'] == false) {
+                $count++;
+                array_push($arr,$val['type']);
+                if ($field == $val['name']){
+                    return [$arr,$count];
+                }
+            }
+        }
     }
+    return [$arr,0];
 }
 
 

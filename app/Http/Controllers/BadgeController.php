@@ -77,28 +77,36 @@ class BadgeController extends Controller {
             $allEvents = $contractModel->getEvents();
             $contractAbi  = $contractModel->getEthabi();
             $type = $rule['type'];
-            $event = formatEvent($allEvents,$rule['action']);
-            if (!$event){
-                return response()
-                    ->json($this->getResponse(400));
-            }
-            $eventSignature = $contractAbi->encodeEventSignature($event);
             if ($type === 'EVENTLOG') {
+                $event = formatEvent($allEvents,$rule['action']);
+                if (!$event){
+                    return response()
+                        ->json($this->getResponse(400));
+                }
+                $eventSignature = $contractAbi->encodeEventSignature($event);
+//                dd($eventSignature);
                 if (isset($rule['blockNumber'])) {
-                    $from = Utils::toHex($rule['blockNumber']['gte']);
-                    $to = Utils::toHex($rule['blockNumber']['lte']);
-                    $data = ['address'=>$contract,'fromBlock'=>'0x'.$from,'toBlock'=>'0x'.$to];
+//                    $from = Utils::toHex($rule['blockNumber']['gte']);
+//                    $to = Utils::toHex($rule['blockNumber']['lte']);
+                    $data = ['address'=>$contract,'fromBlock'=>$rule['blockNumber']['gte'],'toBlock'=>$rule['blockNumber']['lte'],'topic0'=>$eventSignature];
                 }else{
-                    $data = ['address'=>$contract];
+                    $data = ['address'=>$contract,'topic0'=>$eventSignature];
                 }
 //                $res = ETHRequest::Request('eth_getLogs', [$data]);
                 foreach ($rule['operations'][0]['filters'] as $filters){
                     list($ret, $key) =  getEventIndex($allEvents,$rule['action'],$filters['field']);
-                    if ($ret) {
-                        $index = 'topics' . $key + 1;
+                    if ($ret == 'indexed') {
+                        $index = 'topics' . ($key + 1);
                         $data[$index] = $filters['value'];
-                    }else{
-
+                        $res = ETHRequest::etherScanRequest($data);
+                        dd($res);
+                    }else if ($ret == 'non'){
+                        list($nonIndexed,$index) = getEventNonIndexedCount($allEvents,$rule['action'],$filters['field']);
+//                        $ret = $contractAbi->decodeParameters($nonIndexed,$val->data);
+                        dd($nonIndexed,$index);
+                    } else {
+                        return response()
+                            ->json($this->getResponse(400));
                     }
                 }
 

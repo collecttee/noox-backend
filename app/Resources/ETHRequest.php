@@ -20,4 +20,12 @@ class ETHRequest {
         }
         return $body->result;
     }
+    public static function etherScanRequest($params) {
+        $params['apikey'] = env('ETHSCAN_KEY');
+        $data = http_build_query($params);
+        $client = new GuzzleHttp(['timeout' => 60, 'verify' => false]);
+        $response = $client->get(env('ETHSCAN_URL').'?'.$data);
+        $ret = $response->getBody()->getContents();
+        dd($ret);
+    }
 }
