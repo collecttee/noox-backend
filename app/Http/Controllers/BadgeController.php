@@ -70,6 +70,7 @@ class BadgeController extends Controller {
                 ->json($this->getResponse(404));
         }
         $rules = json_decode($ret->eligibilityRule,1);
+        $checkCount = 0;
         // 遍历所有规则 action
         foreach ($rules as $rule){
             $contract = $rule['contract'];
@@ -105,24 +106,66 @@ class BadgeController extends Controller {
                 }
                 //遍历各种规则
 //                $res = ETHRequest::Request('eth_getLogs', [$data]);
-                foreach ($rule['operations'][0]['filters'] as $filters){
+                $aggregations = $rule['operations'][0]['aggregations'][0]['type'];
+                //第一遍通过index直接查出来的 当查不是Index时 直接在这里面过滤
+                $indexRes = [];
+                $hasNonIndex = empty($rule['operations'][0]['filters']) ? false : true;
+                foreach ($rule['operations'][0]['indexFilters'] as $filters){
                     list($ret, $key) =  getEventIndex($allEvents,$rule['action'],$filters['field']);
                     //发现当前所需日志字段是indexed类型
-                    if ($ret == 'indexed') {
+                    if ($ret == 'indexed' && $filters['type'] == 'eq') {
                         $index = 'topic' . ($key + 1);
                         $data[$index] = addAddressPrefix($filters['value']);
                         $topicAnd = 'topic0_'. $index .'_opr';
                         $data[$topicAnd] = 'and';
-                        $res = ETHRequest::etherScanRequest($data);
-                        dd($res);
-                    //不是indexed 类型 那日志存在data里面
-                    }else if ($ret == 'non'){
-                        list($nonIndexed,$index) = getEventNonIndexedCount($allEvents,$rule['action'],$filters['field']);
-//                        $ret = $contractAbi->decodeParameters($nonIndexed,$val->data);
-                        dd($nonIndexed,$index);
-                    } else {
+                    }else {
                         return response()
                             ->json($this->getResponse(400));
+                    }
+                }
+                $res = ETHRequest::etherScanRequest($data);
+                if ($res['status'] == 1) {
+                    if (!$hasNonIndex) {
+                        if ($aggregations == 'count') {
+                            $checkCount += count($res['result']);
+                        }
+                        //todo  checkValue
+                    } else {
+                        $indexRes = array_merge($indexRes,$res['result']);
+                    }
+
+                } else {
+                    return response()
+                        ->json($this->getResponse(600));
+                }
+                //不是indexed 类型 那日志存在data里面
+                foreach ($rule['operations'][0]['filters'] as $filters) {
+                    list($nonIndexed,$index) = getEventNonIndexedCount($allEvents,$rule['action'],$filters['field']);
+                    foreach ($indexRes as $val) {
+                        $decodeResult = $contractAbi->decodeParameters($nonIndexed,$val['data']);
+                        $decodeString = $decodeResult[$index]->toString();
+                        switch ($filters['type']) {
+                            case 'eq':
+                                 if ($decodeString == $filters['value']) {
+                                     if ($aggregations == 'count') {
+                                         $checkCount+=1;
+                                     }
+                                 }
+                                 break;
+                            case 'greater':
+                                if ($decodeString > $filters['value']) {
+                                    if ($aggregations == 'count') {
+                                        $checkCount+=1;
+                                    }
+                                }
+                                break;
+                            case 'range':
+                                if ($decodeString > $filters['value']['gte'] && $decodeString < $filters['value']['lte']) {
+                                    if ($aggregations == 'count') {
+                                        $checkCount+=1;
+                                    }
+                                }
+                        }
                     }
                 }
 
