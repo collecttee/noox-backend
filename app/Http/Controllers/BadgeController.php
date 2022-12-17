@@ -172,7 +172,8 @@ class BadgeController extends Controller {
                 }
             }
         }
-
+        return response()
+            ->json($this->getResponse(200,['result'=>$checkCount >= $ret->required]));
     }
 
     private function calculatedTotalValue($allEvents,$action,$contractAbi,$res) {
