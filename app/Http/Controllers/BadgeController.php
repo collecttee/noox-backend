@@ -55,7 +55,7 @@ class BadgeController extends Controller {
     }
 
 
-    public function eligibilities(Request $request) {
+    private function check(Request $request){
         $validator = Validator::make($request->all(), [
             'badge_id' => 'required',
         ]);
@@ -64,8 +64,12 @@ class BadgeController extends Controller {
             return response()
                 ->json($this->getResponse(403,['detail' => $errors->all()[0]]));
         }
-//        $user = $this->user->address;
         $badgeId = $request->input('badge_id');
+    }
+
+    public function eligibilities($badgeId) {
+
+        $user = $this->user->address;
         $ret = Badges::where('badge_id',$badgeId)->where('status','published')->first();
         if (empty($ret)) {
             return response()
@@ -170,6 +174,31 @@ class BadgeController extends Controller {
                 } else if ($this->aggregations == 'sum') {
                     $checkCount += $this->calculatedTotalValue($allEvents, $rule['action'], $contractAbi, $rightData);
                 }
+            } else if ($type === 'TX') {
+                $data = [
+                    'module' => 'account' ,
+                    'action' => 'txlist',
+                    'address' => $contract ,
+                ];
+                $page = 1;
+                $field = $rule['operations'][0]['filters'][0]['value'];
+                while (true) {
+                    $data['page'] = $page;
+                    $data['offset'] = 10000;
+                    $indexRes = ETHRequest::etherScanRequest($data);
+                    if ($indexRes['status'] != 1) {
+                        break;
+                    }
+                    foreach ($indexRes['result'] as $val) {
+                        if ($val['functionName'] == $field) {
+                            if ($val['from'] == $user){
+                                $checkCount++;
+                            }
+                        }
+                    }
+                    $page++;
+                }
+
             }
         }
         return response()
