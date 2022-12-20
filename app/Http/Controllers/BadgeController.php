@@ -10,12 +10,12 @@ use Web3\Utils;
 
 class BadgeController extends Controller {
     protected $user;
-    public string $aggregations;
-    public string $sumField;
+    public  $aggregations;
+    public  $sumField;
     public function __construct()
     {
-        $this->middleware('auth:api');
-        $this->user = JWTAuth::parseToken()->authenticate();
+        $this->middleware('token.refresh', ['except' => ['login','refresh']]);
+//        $this->user = JWTAuth::parseToken()->authenticate();
     }
     public function create(Request $request){
         $validator = Validator::make($request->all(), [

@@ -9,7 +9,7 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 class AuthController extends Controller {
     public function __construct()
     {
-        $this->middleware('auth:api', ['except' => ['verify','login']]);
+        $this->middleware('token.refresh', ['except' => ['login','verify']]);
     }
     public function sign(string $address)  {
         $randString = bin2hex(random_bytes(20));

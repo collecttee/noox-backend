@@ -16,7 +16,8 @@ class Controller extends BaseController
         403 => 'Form validation failed',
         404 => 'This resource was not found',
         400 => 'Log parsing failed',
-        600 => 'Non compliance'
+        600 => 'Non compliance',
+        500 => 'Unauthorized'
 
     ];
     protected  function getResponse($status,$data = []){
