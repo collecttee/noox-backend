@@ -20,8 +20,8 @@ Route::get('/test', 'TestController@test');
 Route::prefix('v1')->group(function () {
     Route::get('/sign/{address}', 'AuthController@sign');
     Route::get('/verify', 'AuthController@verify');
-    Route::get('/eligibilities', 'BadgeController@eligibilities');
-
+    Route::get('/check', 'BadgeController@check');
+    Route::get('/issuingSignature/{badgeId}', 'BadgeController@issuingSignature');
     Route::post('/badge', 'BadgeController@create');
 });
 

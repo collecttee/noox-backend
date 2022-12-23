@@ -2,6 +2,7 @@
 namespace App\Http\Controllers;
 use App\Badges;
 use App\Resources\ETHRequest;
+use App\Resources\EthSign;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\Request;
 use Tymon\JWTAuth\Facades\JWTAuth;
@@ -15,7 +16,7 @@ class BadgeController extends Controller {
     public function __construct()
     {
         $this->middleware('token.refresh', ['except' => ['login','refresh']]);
-//        $this->user = JWTAuth::parseToken()->authenticate();
+        $this->user = JWTAuth::parseToken()->authenticate();
     }
     public function create(Request $request){
         $validator = Validator::make($request->all(), [
@@ -55,7 +56,7 @@ class BadgeController extends Controller {
     }
 
 
-    private function check(Request $request){
+    public function check(Request $request){
         $validator = Validator::make($request->all(), [
             'badge_id' => 'required',
         ]);
@@ -65,17 +66,20 @@ class BadgeController extends Controller {
                 ->json($this->getResponse(403,['detail' => $errors->all()[0]]));
         }
         $badgeId = $request->input('badge_id');
+        $ret =  $this->eligibilities($badgeId);
+        return response()
+            ->json($this->getResponse(200,['result'=>$ret]));
     }
 
     public function eligibilities($badgeId) {
 
         $user = $this->user->address;
-        $ret = Badges::where('badge_id',$badgeId)->where('status','published')->first();
-        if (empty($ret)) {
+        $dataRet = Badges::where('badge_id',$badgeId)->where('status','published')->first();
+        if (empty($dataRet)) {
             return response()
                 ->json($this->getResponse(404));
         }
-        $rules = json_decode($ret->eligibilityRule,1);
+        $rules = json_decode($dataRet->eligibilityRule,1);
         $checkCount = 0;
 //        $checkSum = 0;
         // 遍历所有规则 action
@@ -144,16 +148,16 @@ class BadgeController extends Controller {
                 }
                 //定义一个新数组，存储最后的正确数据
                 $rightData = [];
+
                 //不是indexed 类型 那日志存在data里面
                 foreach ($rule['operations'][0]['filters'] as $filters) {
                     list($nonIndexed,$index) = getEventNonIndexedCount($allEvents,$rule['action'],$filters['field']);
-                    foreach ($indexRes as $val) {
-                        $decodeResult = $contractAbi->decodeParameters($nonIndexed,$val['result']['data']);
+                    foreach ($indexRes['result'] as $val) {
+                        $decodeResult = $contractAbi->decodeParameters($nonIndexed,$val['data']);
                         $decodeString = $decodeResult[$index]->toString();
                         switch ($filters['type']) {
                             case 'eq':
                                  if ($decodeString == $filters['value']) {
-//
                                      $rightData = array_merge($rightData,$val);
                                  }
                                  break;
@@ -172,7 +176,7 @@ class BadgeController extends Controller {
                 if ($this->aggregations == 'count') {
                     $checkCount += count($rightData);
                 } else if ($this->aggregations == 'sum') {
-                    $checkCount += $this->calculatedTotalValue($allEvents, $rule['action'], $contractAbi, $rightData);
+                    $checkCount += $this->calculatedTotalValue($allEvents, $rule['action'], $contractAbi, ['result'=>$rightData]);
                 }
             } else if ($type === 'TX') {
                 $data = [
@@ -201,10 +205,31 @@ class BadgeController extends Controller {
 
             }
         }
-        return response()
-            ->json($this->getResponse(200,['result'=>$checkCount >= $ret->required]));
+        return $checkCount >= $dataRet->required;
     }
+    public function issuingSignature($badgeId) {
+        $ret = $this->eligibilities($badgeId);
+        if ($ret){
+            $types = ['address', 'uint'];
+            $values = [$this->user->address, $badgeId];
+            $a = EthSign::sha3AbiEncode($types, $values);
+            $command = "node ./node/index.js  {$a}";
+            exec($command, $val, $err);
+            if ($err == 0) {
+                $signature = $val[1];
+                $signature = rtrim(ltrim($signature,"  '"),"'");
+                return response()
+                    ->json($this->getResponse(200,['signature'=>$signature]));
+            }else{
+                return response()
+                    ->json($this->getResponse(501));
+            }
+        }else{
+            return response()
+                ->json($this->getResponse(500));
+        }
 
+    }
     private function calculatedTotalValue($allEvents,$action,$contractAbi,$res) {
         list($ret, $key) =  getEventIndex($allEvents,$action,$this->sumField);
         $checkSum = 0;

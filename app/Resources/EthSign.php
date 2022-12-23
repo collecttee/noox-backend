@@ -33,18 +33,23 @@ class EthSign{
     }
     public function signMessage(string $message): string
     {
+        $ecPrivateKey = $this->ec->keyFromPrivate($this->privateKey, 'hex');
+
 //        $message = "\x19Ethereum Signed Message:\n" . strlen($message) . $message;
-        $message = strlen($message) . $message;
+        $message =  strlen($message) . $message;
+
         $hash = Keccak::hash($message, 256);
 
-        $ecPrivateKey = $this->ec->keyFromPrivate($this->privateKey, 'hex');
         $signature = $ecPrivateKey->sign($hash, ['canonical' => true]);
+
 
         $r = str_pad($signature->r->toString(16), 64, '0', STR_PAD_LEFT);
         $s = str_pad($signature->s->toString(16), 64, '0', STR_PAD_LEFT);
-        $v = dechex($signature->recoveryParam);
+        $v = dechex($signature->recoveryParam + 27);
 
-        return '0x' . $r . $s . 0 . $v;
+
+        echo "Using my script:\n";
+        echo "0x$r$s$v\n";die;
     }
 
 }
